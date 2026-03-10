@@ -1,0 +1,20 @@
+[package]
+name = "terrain_parser"
+version = "0.1.0"
+edition = "2024"
+description = "A Rust library for parsing Cesium quantized-mesh terrain files"
+authors = ["Your Name <your.email@example.com>"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/yourusername/terrain_parser"
+keywords = ["cesium", "terrain", "mesh", "quantized", "3d", "gis"]
+categories = ["science", "game-engines", "parsing"]
+readme = "README.md"
+
+[package.metadata.docs.rs]
+all-features = true
+
+[dependencies]
+byteorder = "1.5"
+thiserror = "1.0"
+log = "0.4"
+bytemuck = "1.15"
