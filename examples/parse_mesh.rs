@@ -3,6 +3,7 @@
 use std::fs::File;
 use std::io::{BufReader, Read, Cursor};
 use byteorder::{LittleEndian,ReadBytesExt};
+use terrain_parser::Vertex;
 use terrain_parser::{parse, tools::decode_gzip};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -27,6 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // println!("center_x:{}",center_x);
     // Parse the mesh
     let mesh = parse(&mut reader)?;
+    // let _ = Vertex::parse(&mut reader);
 
     Ok(())
 }

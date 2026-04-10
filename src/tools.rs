@@ -6,6 +6,19 @@ pub fn zigzag_decode(value: i32) -> i32 {
     ((value >> 1) as i32) ^ (-((value & 1) as i32))
 }
 
+/// High water mark decoding for 32-bit indices.
+/// 32位索引的高水位标记解码
+pub fn decode_indices_hwm32(indices: &mut [u32]) {
+    let mut highest = 0;
+    for i in 0..indices.len() {
+        let code = indices[i];
+        indices[i] = highest - code;
+        if code == 0 {
+            highest += 1;
+        }
+    }
+}
+
 /// Decode gzip-compressed data using the flate2 library.
 /// 使用flate2库解码gzip压缩数据
 /// # Arguments
@@ -14,11 +27,12 @@ pub fn zigzag_decode(value: i32) -> i32 {
 /// * `Ok(Vec<u8>)` - Decompressed bytes
 /// * `Err(Error)` - If decompression fails
 pub fn decode_gzip(data: &[u8]) -> crate::Result<Vec<u8>> {
-    use std::io::Read;
     use flate2::read::GzDecoder;
+    use std::io::Read;
     let mut decoder = GzDecoder::new(data);
     let mut decompressed = Vec::new();
-    decoder.read_to_end(&mut decompressed)
+    decoder
+        .read_to_end(&mut decompressed)
         .map_err(|e| crate::Error::InvalidFormat(format!("Gzip decompression failed: {}", e)))?;
     Ok(decompressed)
 }

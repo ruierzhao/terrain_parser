@@ -7,6 +7,7 @@
 //! 本库提供了解析和处理这些文件的功能
 
 mod error;
+mod extention;
 mod header;
 mod vertex;
 pub mod tools;
@@ -37,7 +38,7 @@ pub fn parse<R: Read + Seek>(reader: &mut R) -> Result<QuantizedMeshTerrain>{
     let header = Header::parse(reader)?;
     let vertex = Vertex::parse(reader)?;
 
-    println!("vertexCount:{}", vertex.vertexCount);
+    println!("vertexCount:{}", vertex.vertex_count);
     Ok(QuantizedMeshTerrain{
         header,
         vertex
