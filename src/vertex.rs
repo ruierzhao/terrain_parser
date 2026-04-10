@@ -6,7 +6,7 @@ use std::io::{Read, Seek, SeekFrom};
 
 use crate::Result;
 use crate::tools;
-use crate::extention::QuantizedMeshExtensionIds;
+use crate::extention::Extensions;
 
 /// A quantized vertex.
 /// 量化顶点
@@ -27,6 +27,9 @@ pub struct Vertex {
     pub south_indices: Vec<u32>,
     pub east_indices: Vec<u32>,
     pub north_indices: Vec<u32>,
+    /// Optional extensions for the tile
+    /// 图块的可选扩展数据
+    pub extensions: Option<Extensions>,
 }
 
 impl Vertex {
@@ -104,7 +107,8 @@ impl Vertex {
         let _ =
             Self::parse_edge_indices(reader, vertex_count, north_vertex_count, &mut north_indices);
 
-        Self::parse_extentions(reader, vertex_count)?;
+        // Parse extensions if any
+        let extensions = Extensions::parse(reader, vertex_count)?;
         Ok(Self {
             vertex_count,
             u: u_buffer,
@@ -116,6 +120,7 @@ impl Vertex {
             south_indices,
             east_indices,
             north_indices,
+            extensions: if extensions.is_empty() { None } else { Some(extensions) },
         })
     }
 
@@ -179,77 +184,4 @@ impl Vertex {
         Ok(())
     }
 
-    fn parse_extentions<R: Read + Seek>(
-        reader: &mut R,
-        vertex_count: usize,
-    ) -> Result<()> {
-        let start_pos = reader.stream_position()?;
-        // Get total file size
-        let file_size = reader.seek(SeekFrom::End(0))?;
-        // Restore position
-        reader.seek(SeekFrom::Start(start_pos))?;
-
-        while reader.stream_position()? < file_size {
-            let extension_id = reader.read_u8()?;
-            let extension_length = reader.read_u32::<LittleEndian>()? as u64;
-
-            match extension_id {
-                id if id == QuantizedMeshExtensionIds::OctVertexNormals as u8 => {
-                    // OCT_VERTEX_NORMALS
-                    // Expected length: vertex_count * 2
-                    let expected_len = vertex_count * 2;
-                    if extension_length != expected_len as u64 {
-                        return Err(crate::Error::InvalidFormat(format!(
-                            "OCT_VERTEX_NORMALS extension length mismatch: expected {}, got {}",
-                            expected_len, extension_length
-                        )));
-                    }
-                    // Skip normal data
-                    reader.seek(SeekFrom::Current(extension_length as i64))?;
-                }
-                id if id == QuantizedMeshExtensionIds::WaterMask as u8 => {
-                    // WATER_MASK
-                    // Skip water mask data
-                    reader.seek(SeekFrom::Current(extension_length as i64))?;
-                }
-                id if id == QuantizedMeshExtensionIds::Metadata as u8 => {
-                    // METADATA
-                    // Read string length
-                    let string_length = reader.read_u32::<LittleEndian>()? as u64;
-                    // Verify string length fits within extension_length
-                    if string_length + 4 > extension_length {
-                        return Err(crate::Error::InvalidFormat(format!(
-                            "METADATA string length exceeds extension length: {} > {}",
-                            string_length + 4, extension_length
-                        )));
-                    }
-                    // Skip JSON string
-                    reader.seek(SeekFrom::Current(string_length as i64))?;
-                    // Skip any remaining bytes in this extension
-                    let remaining = extension_length - (string_length + 4);
-                    if remaining > 0 {
-                        reader.seek(SeekFrom::Current(remaining as i64))?;
-                    }
-                }
-                _ => {
-                    // Unknown extension, skip it
-                    reader.seek(SeekFrom::Current(extension_length as i64))?;
-                }
-            }
-        }
-        Ok(())
-    }
-
-    fn get_reader_size<R: Read + Seek>(reader: &mut R) -> Result<u64> {
-        // 保存当前位置
-        let current_pos = reader.stream_position()?;
-
-        // 跳转到末尾获取总大小
-        let size = reader.seek(SeekFrom::End(0))?;
-
-        // 恢复原始位置
-        reader.seek(SeekFrom::Start(current_pos))?;
-
-        Ok(size)
-    }
 }

@@ -2,7 +2,7 @@
 //! quantized-mesh文件头部解析
 
 use byteorder::{LittleEndian, ReadBytesExt};
-use std::io::{Read, Seek, Cursor};
+use std::io::{Read, Seek};
 
 use crate::Result;
 
