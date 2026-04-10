@@ -2,7 +2,7 @@
 //! quantized-mesh文件头部解析
 
 use byteorder::{LittleEndian, ReadBytesExt};
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{Read, Seek, Cursor};
 
 use crate::Result;
 
@@ -42,9 +42,6 @@ impl Header {
     /// The reader must be positioned at the start of the header (after vertex count).
     /// 读取器必须位于头部开始位置（顶点数量之后）
     pub fn parse<R: Read + Seek>(reader: &mut R) -> Result<Self> {
-        // Note: caller should have already read the vertex count
-        // No need to skip bytes here
-
         let center_x = reader.read_f64::<LittleEndian>()?;
         let center_y = reader.read_f64::<LittleEndian>()?;
         let center_z = reader.read_f64::<LittleEndian>()?;

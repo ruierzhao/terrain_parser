@@ -8,36 +8,38 @@
 
 mod error;
 mod header;
-mod mesh;
+mod vertex;
+pub mod tools;
+
+use std::io::{Read, Seek};
 
 pub use error::Error;
 pub use header::Header;
-pub use mesh::Mesh;
+pub use vertex::Vertex;
 
 /// Result type for the terrain parser library.
 /// 地形解析器库的Result类型
 pub type Result<T> = std::result::Result<T, Error>;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
 
-    #[test]
-    fn test_vertex_creation() {
-        // Values in range 0-32767 as per quantized-mesh spec
-        let vertex = mesh::Vertex::new(32767, 16383, 24575);
-        assert!((vertex.u - 1.0).abs() < 0.0001);
-        assert!((vertex.v - 0.5).abs() < 0.0001);
-        assert!((vertex.height_normalized - 0.75).abs() < 0.0001);
-        assert_eq!(vertex.raw, [32767, 16383, 24575]);
-    }
+pub struct QuantizedMeshTerrain{
+    header: Header,
+    vertex: Vertex
+}
 
-    #[test]
-    fn test_vertex_denormalize() {
-        let vertex = mesh::Vertex::new(0, 32767, 16383);
-        let (u, v, height) = vertex.denormalize(100.0, 200.0);
-        assert!((u - 0.0).abs() < 0.0001);
-        assert!((v - 1.0).abs() < 0.0001);
-        assert!((height - 150.0).abs() < 0.0001); // 100 + 0.5 * (200-100)
-    }
+impl QuantizedMeshTerrain {
+    pub fn parse(){}
+}
+
+
+pub fn parse<R: Read + Seek>(reader: &mut R) -> Result<QuantizedMeshTerrain>{
+    println!("parse start...");
+    let header = Header::parse(reader)?;
+    let vertex = Vertex::parse(reader)?;
+
+    println!("vertexCount:{}", vertex.vertexCount);
+    Ok(QuantizedMeshTerrain{
+        header,
+        vertex
+    })
 }
