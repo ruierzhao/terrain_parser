@@ -26,20 +26,11 @@ pub use vertex::Vertex;
 /// 地形解析器库的Result类型
 pub type Result<T> = std::result::Result<T, Error>;
 
+
 #[derive(Debug, Serialize)]
 pub struct QuantizedMeshTerrain{
     pub header: Header,
     pub vertex: Vertex
-}
-
-
-pub fn parse<R: Read + Seek>(reader: &mut R) -> Result<QuantizedMeshTerrain>{
-    let header = Header::parse(reader)?;
-    let vertex = Vertex::parse(reader)?;
-    Ok(QuantizedMeshTerrain{
-        header,
-        vertex
-    })
 }
 
 /// Parse terrain data from raw bytes (e.g. from HTTP response or ArrayBuffer).
@@ -52,3 +43,14 @@ pub fn parse_bytes(data: &[u8]) -> Result<QuantizedMeshTerrain> {
     let mut reader = std::io::Cursor::new(&decompressed);
     parse(&mut reader)
 }
+
+
+pub fn parse<R: Read + Seek>(reader: &mut R) -> Result<QuantizedMeshTerrain>{
+    let header = Header::parse(reader)?;
+    let vertex = Vertex::parse(reader)?;
+    Ok(QuantizedMeshTerrain{
+        header,
+        vertex
+    })
+}
+
