@@ -1,20 +1,20 @@
 # Terrain Parser
 
-Rust 库，用于解析 **Cesium quantized-mesh** 地形文件 —— CesiumJS 3D 地球可视化使用的一种紧凑二进制地形格式。
+A Rust library for parsing **Cesium quantized-mesh** terrain files — the compact binary terrain format used by CesiumJS for 3D globe visualization.
 
-## 格式概览
+## Format Overview
 
-quantized-mesh 文件的二进制布局：
+Binary layout of a quantized-mesh file:
 
-| 区域 | 内容 |
+| Section | Content |
 |---|---|
-| Header | 瓦片中心坐标 (f64×3)、高度范围 (f32×2)、包围球 (f64×4)、地平线遮挡点 (f64×3) |
-| Vertex Data | 量化顶点 `[u16, u16, u16]` — u/v/height 三个通道，经 zigzag-delta 编码 |
-| Index Data | 三角索引 (u16 或 u32，取决于顶点数是否超过 65536)，高水位标记编码 |
-| Edge Indices | 四边裙边顶点索引 (north/south/east/west) |
-| Extensions | 可选扩展：OctVertexNormals / WaterMask / Metadata (JSON) |
+| Header | Tile center (f64×3), height range (f32×2), bounding sphere (f64×4), horizon occlusion point (f64×3) |
+| Vertex Data | Quantized vertices `[u16, u16, u16]` — three channels (u/v/height), zigzag-delta encoded |
+| Index Data | Triangle indices (u16 or u32 depending on whether vertex count exceeds 65536), high-water-mark encoded |
+| Edge Indices | Four edge skirt vertex index lists (north/south/east/west) |
+| Extensions | Optional: OctVertexNormals / WaterMask / Metadata (JSON) |
 
-## 用法
+## Usage
 
 ```toml
 [dependencies]
@@ -37,40 +37,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-## 命令行工具
+### Parsing from bytes
 
-`src/bin/terrain-parser.rs` 是一个 CLI 工具，可直接在终端解析 `.terrain` 文件并展示详细信息。支持自动检测并解压 gzip 压缩的地形文件。
-
-```bash
-# 人类可读的详细输出
-cargo run --bin terrain-parser -- path/to/tile.terrain
-
-# 自定义采样数量
-cargo run --bin terrain-parser -- path/to/tile.terrain -v 20 -t 10
-
-# JSON 格式输出（便于管道处理）
-cargo run --bin terrain-parser -- path/to/tile.terrain --json > result.json
-```
-
-### 命令行参数
-
-| 参数 | 说明 |
-|---|---|
-| `<file>` | 地形文件路径（必需） |
-| `--json` | 输出 pretty-printed JSON 格式序列化的完整 Mesh 数据 |
-| `-v, --sample-vertices <N>` | 人类可读输出中展示的采样顶点数（默认 5） |
-| `-t, --sample-triangles <N>` | 人类可读输出中展示的采样三角形数（默认 5） |
-
-人类可读输出包含 **Header**（中心坐标、高度范围、包围球、地平线遮挡点）、**Vertex Data**（顶点数、三角数、U/V/Height 范围、采样顶点和三角索引）、**Edge Indices**（四边裙边顶点计数及采样）、**Extensions**（法线、水掩码、元数据）等信息。JSON 模式输出完整的 `QuantizedMeshTerrain` 序列化结果。
-
-## 从 HTTP 响应解析
-
-地形文件通常通过网络获取（`reqwest` / `fetch`）。`parse_bytes` 接收字节切片，自动检测并解压 gzip：
+`parse_bytes` accepts a byte slice, auto-detects gzip compression, and decompresses transparently:
 
 ```rust
 use terrain_parser::parse_bytes;
 
-// 使用 reqwest 获取地形数据
+let data = std::fs::read("tile.terrain")?;
+let mesh = parse_bytes(&data)?;
+```
+
+### Parsing from an HTTP response
+
+Terrain files are often fetched over the network. Use `parse_bytes` with e.g. `reqwest`:
+
+```rust
+use terrain_parser::parse_bytes;
+
 let response = reqwest::get("http://localhost:8000/data/terrain/5.terrain")
     .await?
     .bytes()
@@ -80,44 +64,70 @@ let mesh = parse_bytes(&response)?;
 println!("Vertex count: {}", mesh.vertex.vertex_count);
 ```
 
-在浏览器 WASM 中，JS 侧 `ArrayBuffer` 传入后直接调用 `parse_bytes` 即可，无需手动处理 `Cursor` 或 gzip。
+## CLI Tool
 
-## WebAssembly / 浏览器端
+`src/bin/terrain-parser.rs` is a CLI tool for inspecting `.terrain` files in the terminal. It auto-detects and decompresses gzip-compressed terrain files.
 
-编译为 WASM 可在浏览器中直接解析地形文件：
+```bash
+# Human-readable detailed output
+cargo run --bin terrain-parser -- path/to/tile.terrain
 
-### 构建
+# Custom sample counts
+cargo run --bin terrain-parser -- path/to/tile.terrain -v 20 -t 10
+
+# JSON output (for piping)
+cargo run --bin terrain-parser -- path/to/tile.terrain --json > result.json
+```
+
+### CLI Arguments
+
+| Argument | Description |
+|---|---|
+| `<file>` | Path to terrain file (required) |
+| `--json` | Output pretty-printed JSON of the full `QuantizedMeshTerrain` |
+| `-v, --sample-vertices <N>` | Number of sample vertices shown in human-readable output (default: 5) |
+| `-t, --sample-triangles <N>` | Number of sample triangles shown in human-readable output (default: 5) |
+
+Human-readable output includes **Header** (center coordinates, height range, bounding sphere, horizon occlusion point), **Vertex Data** (vertex/triangle counts, U/V/Height ranges, sampled vertices and triangles), **Edge Indices** (counts and samples for all four edges), and **Extensions** (normals, water mask, metadata).
+
+## WebAssembly / Browser
+
+Compile to WASM for in-browser terrain file parsing.
+
+### Build
 
 ```bash
 wasm-pack build --target web --out-dir examples/viewer/pkg
 ```
 
-### 托管 WASM 并运行示例
+### Serve and run the viewer
 
-由于浏览器安全策略，WASM 需要通过 HTTP 服务加载，不能从 `file://` 协议打开。
+Browser security policies require WASM to be served over HTTP, not opened from `file://`.
 
 ```bash
 cd examples/viewer
-npx serve .          # 访问 http://localhost:3000
-# 或
+npx serve .          # Visit http://localhost:3000
+# or
 python -m http.server 8000
 ```
 
-打开浏览器后，点击 **"Load Sample"** 加载内置的 `5.terrain` 样本，或拖拽任意 `.terrain` 文件到页面上。解析结果按 **Header / Vertices / Indexes / Edge Indices / Extensions** 分标签展示，同时提供 **Raw JSON** 完整数据视图。
+Open the browser, click **"Load Sample"** to load the bundled `5.terrain` sample, or drag-and-drop any `.terrain` file. Parsed results are displayed across tabs: **Header / Vertices / Indexes / Edge Indices / Extensions**, with a **Raw JSON** view for the complete dataset.
 
-## 项目结构
+In your own WASM app, call `parse_bytes` with a `&[u8]` from a JS `ArrayBuffer` — no manual `Cursor` or gzip handling needed.
+
+## Project Structure
 
 ```
 src/
-├── lib.rs                — 入口：QuantizedMeshTerrain + parse()
-├── header.rs             — Header 结构体（小端序 f64/f32 读取）
-├── vertex.rs             — Vertex 数据、三角索引、边缘索引、扩展解析
-├── extention.rs          — 扩展：OctVertexNormals / WaterMask / Metadata
-├── wasm.rs               — wasm-bindgen 导出接口
-├── error.rs              — thiserror 错误枚举
-├── tools.rs              — zigzag 解码、HWM 索引解码、gzip 解压
+├── lib.rs                — Entry point: QuantizedMeshTerrain + parse() / parse_bytes()
+├── header.rs             — Header struct (little-endian f64/f32 reader)
+├── vertex.rs             — Vertex data, triangle indices, edge indices, extension dispatch
+├── extention.rs          — Extensions: OctVertexNormals / WaterMask / Metadata
+├── wasm.rs               — wasm-bindgen exports
+├── error.rs              — thiserror error enum
+├── tools.rs              — zigzag decode, HWM index decode, gzip decompression
 └── bin/
-    └── terrain-parser.rs — CLI 工具（clap derive）
+    └── terrain-parser.rs — CLI tool (clap derive)
 ```
 
 ## License
