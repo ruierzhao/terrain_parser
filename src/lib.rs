@@ -7,7 +7,7 @@
 //! 本库提供了解析和处理这些文件的功能
 
 mod error;
-mod extention;
+mod extentions;
 mod header;
 mod vertex;
 pub mod tools;
