@@ -7,7 +7,7 @@ use std::io::{Read, Seek, SeekFrom};
 
 use crate::Result;
 use crate::tools;
-use crate::extention::Extensions;
+use crate::extentions::Extensions;
 
 /// A quantized vertex.
 /// 量化顶点
