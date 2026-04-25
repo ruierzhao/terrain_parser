@@ -83,7 +83,6 @@ impl Vertex {
         }
 
         let triangle_count = reader.read_u32::<LittleEndian>()? as usize;
-        println!(">> triangleCount : {:?}", triangle_count);
 
         let mut indexes = Vec::<u32>::with_capacity(triangle_count as usize * 3);
         let _ = Self::parse_indexes(reader, vertex_count, triangle_count as usize, &mut indexes);

@@ -80,9 +80,7 @@ impl Extensions {
 
         while reader.stream_position()? < file_size {
             let extension_id = reader.read_u8()?;
-            println!(">> extension_id : {:?}", extension_id);
             let extension_length = reader.read_u32::<LittleEndian>()? as u64;
-            println!(">> extension_length : {:?}", extension_length);
 
             match extension_id {
                 id if id == QuantizedMeshExtensionIds::OctVertexNormals as u8 => {
@@ -113,7 +111,6 @@ impl Extensions {
                     // METADATA
                     // Read string length
                     let string_length = reader.read_u32::<LittleEndian>()? as usize;
-                    println!(">> string_length : {:?}", string_length);
                     // Verify string length fits within extension_length
                     if string_length as u64 + 4 > extension_length {
                         return Err(crate::Error::InvalidFormat(format!(
@@ -126,7 +123,6 @@ impl Extensions {
                     reader.read_exact(&mut json_bytes)?;
                     let json = String::from_utf8(json_bytes)
                         .map_err(|e| crate::Error::InvalidFormat(format!("Invalid UTF-8 in metadata: {}", e)))?;
-                    println!(">> json : {:?}", json);
                     extensions.metadata = Some(Metadata { json });
                     // Skip any remaining bytes in this extension
                     let remaining = extension_length - (string_length as u64 + 4);

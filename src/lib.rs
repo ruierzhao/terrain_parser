@@ -34,13 +34,21 @@ pub struct QuantizedMeshTerrain{
 
 
 pub fn parse<R: Read + Seek>(reader: &mut R) -> Result<QuantizedMeshTerrain>{
-    println!("parse start...");
     let header = Header::parse(reader)?;
     let vertex = Vertex::parse(reader)?;
-
-    println!("vertexCount:{}", vertex.vertex_count);
     Ok(QuantizedMeshTerrain{
         header,
         vertex
     })
+}
+
+/// Parse terrain data from raw bytes (e.g. from HTTP response or ArrayBuffer).
+/// Auto-detects and decompresses gzip if the data starts with the gzip magic bytes.
+pub fn parse_bytes(data: &[u8]) -> Result<QuantizedMeshTerrain> {
+    let decompressed = match tools::decode_gzip(data) {
+        Ok(d) => d,
+        Err(_) => data.to_vec(),
+    };
+    let mut reader = std::io::Cursor::new(&decompressed);
+    parse(&mut reader)
 }
