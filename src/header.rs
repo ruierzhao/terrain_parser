@@ -2,13 +2,14 @@
 //! quantized-mesh文件头部解析
 
 use byteorder::{LittleEndian, ReadBytesExt};
+use serde::Serialize;
 use std::io::{Read, Seek};
 
 use crate::Result;
 
 /// The header of a quantized-mesh file.
 /// quantized-mesh文件的头部结构
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct Header {
     /// The center of the tile in Earth-centered Fixed coordinates.
     /// 瓦片在地球中心固定坐标系中的中心点

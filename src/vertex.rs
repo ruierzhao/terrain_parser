@@ -2,6 +2,7 @@
 //! quantized-mesh文件的网格数据结构
 
 use byteorder::{LittleEndian, ReadBytesExt};
+use serde::Serialize;
 use std::io::{Read, Seek, SeekFrom};
 
 use crate::Result;
@@ -10,7 +11,7 @@ use crate::extention::Extensions;
 
 /// A quantized vertex.
 /// 量化顶点
-#[derive(Debug)]
+#[derive(Debug, Serialize)]
 pub struct Vertex {
     pub vertex_count: usize,
     pub triangle_count: usize,

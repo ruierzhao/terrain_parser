@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terrain Parser Viewer</title>
+<style>
+:root {
+  --bg: #1a1a2e;
+  --surface: #16213e;
+  --primary: #0f3460;
+  --accent: #e94560;
+  --text: #eee;
+  --dim: #999;
+  --border: #2a2a4a;
+  --green: #4caf84;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+header h1 { font-size: 1.2rem; font-weight: 600; }
+header span.status { font-size: 0.8rem; color: var(--dim); }
+.main { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; padding: 16px 24px; height: calc(100vh - 80px); }
+@media (max-width: 900px) { .main { grid-template-columns: 1fr; } }
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.panel-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--dim);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+.drop-zone {
+  border: 2px dashed var(--border);
+  border-radius: 8px;
+  padding: 40px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s;
+  margin-bottom: 16px;
+}
+.drop-zone:hover, .drop-zone.drag-over { border-color: var(--accent); }
+.drop-zone p { color: var(--dim); }
+.btn {
+  background: var(--primary);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background 0.2s;
+}
+.btn:hover { background: #1a4a80; }
+.btn.accent { background: var(--accent); }
+.btn.accent:hover { background: #d63850; }
+.controls { display: flex; gap: 8px; margin-bottom: 16px; }
+.file-name { font-size: 0.8rem; color: var(--dim); margin-top: 8px; }
+.section { margin-bottom: 16px; }
+.section-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+}
+table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+th, td { padding: 4px 8px; text-align: left; border-bottom: 1px solid var(--border); }
+th { color: var(--dim); font-weight: 500; }
+td { font-family: 'Consolas', 'Fira Code', monospace; font-size: 0.78rem; }
+.stat { display: inline-flex; align-items: center; gap: 4px; background: var(--primary); padding: 4px 10px; border-radius: 4px; font-size: 0.78rem; }
+.stat .label { color: var(--dim); }
+.stat .value { color: var(--green); font-weight: 600; font-family: monospace; }
+.stats { display: flex; flex-wrap: wrap; gap: 8px; }
+pre {
+  background: #0d1117;
+  padding: 12px;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  overflow-x: auto;
+  max-height: 500px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.vertex-table { max-height: 300px; overflow-y: auto; }
+.vertex-table th { position: sticky; top: 0; background: var(--surface); z-index: 1; }
+.hidden { display: none; }
+.error-msg { background: #3d1111; border: 1px solid #e94560; color: #faa; padding: 12px; border-radius: 6px; font-size: 0.8rem; }
+.data-tabs { display: flex; gap: 2px; margin-bottom: 12px; }
+.tab {
+  background: var(--primary);
+  border: 1px solid var(--border);
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  color: var(--dim);
+  border-radius: 4px 4px 0 0;
+  transition: color 0.2s, background 0.2s;
+}
+.tab.active { background: var(--surface); color: var(--accent); border-bottom-color: var(--surface); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Terrain Parser — Quantized-Mesh Viewer</h1>
+  <span class="status" id="status">Initializing...</span>
+</header>
+
+<div class="main">
+  <!-- Left: Input -->
+  <div class="panel">
+    <div class="panel-header">Input</div>
+    <div class="panel-body">
+      <div class="drop-zone" id="dropZone">
+        <p>Drop a .terrain file here, or click to browse</p>
+        <input type="file" id="fileInput" accept=".terrain,.quantized-mesh" style="display:none">
+        <div class="file-name" id="fileName"></div>
+      </div>
+      <div class="controls">
+        <button class="btn accent" id="loadSample">Load Sample (5.terrain)</button>
+        <button class="btn" id="clearBtn">Clear</button>
+      </div>
+      <div id="errorBox"></div>
+    </div>
+  </div>
+
+  <!-- Right: Output -->
+  <div class="panel" id="outputPanel">
+    <div class="panel-header">Parsed Data</div>
+    <div class="panel-body" id="output">
+      <p style="color: var(--dim)">Load a terrain file to see parsed data.</p>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import init, { parse_terrain_bytes, parse_terrain_pretty } from './pkg/terrain_parser.js';
+
+const statusEl = document.getElementById('status');
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+const fileName = document.getElementById('fileName');
+const loadSample = document.getElementById('loadSample');
+const clearBtn = document.getElementById('clearBtn');
+const errorBox = document.getElementById('errorBox');
+const output = document.getElementById('output');
+
+let wasmReady = false;
+
+async function initWasm() {
+  statusEl.textContent = 'Loading WASM...';
+  statusEl.style.color = 'var(--dim)';
+  await init();
+  wasmReady = true;
+  statusEl.textContent = 'Ready';
+  statusEl.style.color = 'var(--green)';
+}
+
+function showError(msg) {
+  errorBox.innerHTML = `<div class="error-msg">${msg}</div>`;
+}
+
+function clearError() { errorBox.innerHTML = ''; }
+
+async function parseAndShow(bytes, name) {
+  clearError();
+  fileName.textContent = name;
+  const t0 = performance.now();
+  const json = parse_terrain_pretty(bytes);
+  const elapsed = (performance.now() - t0).toFixed(1);
+  const data = JSON.parse(json);
+  renderOutput(data, elapsed);
+}
+
+function renderOutput(data, elapsed) {
+  const h = data.header;
+  const v = data.vertex;
+
+  // Summary stats row
+  let stats = [
+    ['Vertices', v.vertex_count],
+    ['Triangles', v.triangle_count],
+    ['West edge', v.west_indices?.length || 0],
+    ['South edge', v.south_indices?.length || 0],
+    ['East edge', v.east_indices?.length || 0],
+    ['North edge', v.north_indices?.length || 0],
+    ['Extensions', v.extensions ? Object.keys(v.extensions).filter(k => v.extensions[k] !== null).join(', ') || 'none' : 'none'],
+    ['Parse time', `${elapsed}ms`],
+  ];
+
+  let html = '<div class="stats">' + stats.map(s =>
+    `<div class="stat"><span class="label">${s[0]}:</span> <span class="value">${s[1]}</span></div>`
+  ).join('') + '</div>';
+
+  // Tabs for different data views
+  html += `
+  <div class="data-tabs" style="margin-top:16px">
+    <button class="tab active" data-tab="header">Header</button>
+    <button class="tab" data-tab="vertex">Vertices (first 50)</button>
+    <button class="tab" data-tab="indexes">Indexes (first 60)</button>
+    <button class="tab" data-tab="edges">Edge Indices</button>
+    <button class="tab" data-tab="ext">Extensions</button>
+    <button class="tab" data-tab="raw">Raw JSON</button>
+  </div>`;
+
+  // Header tab
+  html += `<div class="tab-content active" data-content="header">
+    <div class="section-title">Center (ECEF)</div>
+    <table><tr><th>X</th><th>Y</th><th>Z</th></tr>
+    <tr><td>${h.center_x}</td><td>${h.center_y}</td><td>${h.center_z}</td></tr></table>
+    <div class="section-title" style="margin-top:12px">Height Range</div>
+    <table><tr><th>Min</th><th>Max</th></tr>
+    <tr><td>${h.minimum_height}</td><td>${h.maximum_height}</td></tr></table>
+    <div class="section-title" style="margin-top:12px">Bounding Sphere</div>
+    <table><tr><th>Center X</th><th>Center Y</th><th>Center Z</th><th>Radius</th></tr>
+    <tr><td>${h.bounding_sphere_center_x}</td><td>${h.bounding_sphere_center_y}</td><td>${h.bounding_sphere_center_z}</td><td>${h.bounding_sphere_radius}</td></tr></table>
+    <div class="section-title" style="margin-top:12px">Horizon Occlusion Point</div>
+    <table><tr><th>X</th><th>Y</th><th>Z</th></tr>
+    <tr><td>${h.horizon_occlusion_point_x}</td><td>${h.horizon_occlusion_point_y}</td><td>${h.horizon_occlusion_point_z}</td></tr></table>
+  </div>`;
+
+  // Vertex tab
+  const maxVerts = Math.min(v.vertex_count, 50);
+  let vertRows = '';
+  for (let i = 0; i < maxVerts; i++) {
+    vertRows += `<tr><td>${i}</td><td>${v.u[i]}</td><td>${v.v[i]}</td><td>${v.height[i]}</td></tr>`;
+  }
+  html += `<div class="tab-content" data-content="vertex">
+    <p style="font-size:0.8rem; color:var(--dim); margin-bottom:8px">Showing first ${maxVerts} of ${v.vertex_count} vertices (U, V, Height after zigzag-delta decode)</p>
+    <div class="vertex-table"><table>
+    <tr><th>#</th><th>U</th><th>V</th><th>Height</th></tr>
+    ${vertRows}</table></div>
+  </div>`;
+
+  // Indexes tab
+  const maxIdx = Math.min(v.indexes.length, 60);
+  let idxRows = '';
+  for (let i = 0; i < maxIdx; i += 3) {
+    const tri = i / 3;
+    idxRows += `<tr><td>${tri}</td><td>${v.indexes[i]}</td><td>${v.indexes[i+1]||''}</td><td>${v.indexes[i+2]||''}</td></tr>`;
+  }
+  html += `<div class="tab-content" data-content="indexes">
+    <p style="font-size:0.8rem; color:var(--dim); margin-bottom:8px">Showing first ${Math.floor(maxIdx/3)} of ${v.triangle_count} triangles</p>
+    <div class="vertex-table"><table>
+    <tr><th>Tri #</th><th>Idx 0</th><th>Idx 1</th><th>Idx 2</th></tr>
+    ${idxRows}</table></div>
+  </div>`;
+
+  // Edge indices tab
+  html += `<div class="tab-content" data-content="edges">
+    <div class="section-title">West (${v.west_indices?.length || 0})</div>
+    <pre>${(v.west_indices || []).slice(0,30).join(', ')}${v.west_indices?.length > 30 ? ' ...' : ''}</pre>
+    <div class="section-title" style="margin-top:8px">South (${v.south_indices?.length || 0})</div>
+    <pre>${(v.south_indices || []).slice(0,30).join(', ')}${v.south_indices?.length > 30 ? ' ...' : ''}</pre>
+    <div class="section-title" style="margin-top:8px">East (${v.east_indices?.length || 0})</div>
+    <pre>${(v.east_indices || []).slice(0,30).join(', ')}${v.east_indices?.length > 30 ? ' ...' : ''}</pre>
+    <div class="section-title" style="margin-top:8px">North (${v.north_indices?.length || 0})</div>
+    <pre>${(v.north_indices || []).slice(0,30).join(', ')}${v.north_indices?.length > 30 ? ' ...' : ''}</pre>
+  </div>`;
+
+  // Extensions tab
+  let extHtml = '';
+  if (v.extensions) {
+    const ext = v.extensions;
+    if (ext.oct_vertex_normals) {
+      extHtml += `<div class="section-title">Oct Vertex Normals</div>
+        <p style="font-size:0.78rem; color:var(--dim)">xy data length: ${ext.oct_vertex_normals.xy.length} bytes (${ext.oct_vertex_normals.xy.length / 2} normals)</p>
+        <pre>First 20 bytes: ${ext.oct_vertex_normals.xy.slice(0,20).join(', ')}</pre>`;
+    }
+    if (ext.water_mask) {
+      extHtml += `<div class="section-title" style="margin-top:8px">Water Mask</div>
+        <p style="font-size:0.78rem; color:var(--dim)">mask data length: ${ext.water_mask.mask.length} bytes (256x256)</p>`;
+    }
+    if (ext.metadata) {
+      extHtml += `<div class="section-title" style="margin-top:8px">Metadata (JSON)</div>
+        <pre>${escapeHtml(ext.metadata.json)}</pre>`;
+    }
+    if (ext.unknown?.length) {
+      extHtml += `<div class="section-title" style="margin-top:8px">Unknown Extensions</div>`;
+      ext.unknown.forEach(([id, data]) => {
+        extHtml += `<p style="font-size:0.78rem; color:var(--dim)">ID ${id}: ${data.length} bytes</p>`;
+      });
+    }
+    if (!extHtml) extHtml = '<p style="color:var(--dim)">No extensions present.</p>';
+  } else {
+    extHtml = '<p style="color:var(--dim)">No extensions present.</p>';
+  }
+  html += `<div class="tab-content" data-content="ext">${extHtml}</div>`;
+
+  // Raw JSON tab
+  html += `<div class="tab-content" data-content="raw">
+    <pre>${escapeHtml(JSON.stringify(data, null, 2))}</pre>
+  </div>`;
+
+  output.innerHTML = html;
+
+  // Wire up tab clicks
+  output.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      output.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      output.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      tab.classList.add('active');
+      const target = output.querySelector(`[data-content="${tab.dataset.tab}"]`);
+      if (target) target.classList.add('active');
+    });
+  });
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+// --- Event handlers ---
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) processFile(file);
+});
+fileInput.addEventListener('change', () => {
+  const file = fileInput.files[0];
+  if (file) processFile(file);
+});
+
+loadSample.addEventListener('click', async () => {
+  clearError();
+  fileName.textContent = 'Loading 5.terrain...';
+  try {
+    const resp = await fetch('5.terrain');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const bytes = new Uint8Array(await resp.arrayBuffer());
+    parseAndShow(bytes, '5.terrain');
+  } catch (e) {
+    showError(`Failed to load sample: ${e.message}`);
+    fileName.textContent = '';
+  }
+});
+
+clearBtn.addEventListener('click', () => {
+  output.innerHTML = '<p style="color: var(--dim)">Load a terrain file to see parsed data.</p>';
+  fileName.textContent = '';
+  clearError();
+});
+
+function processFile(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    const bytes = new Uint8Array(reader.result);
+    parseAndShow(bytes, file.name);
+  };
+  reader.onerror = () => showError('Failed to read file.');
+  reader.readAsArrayBuffer(file);
+}
+
+// Init
+initWasm();
+</script>
+</body>
+</html>

@@ -12,6 +12,10 @@ mod header;
 mod vertex;
 pub mod tools;
 
+#[cfg(target_arch = "wasm32")]
+pub mod wasm;
+
+use serde::Serialize;
 use std::io::{Read, Seek};
 
 pub use error::Error;
@@ -22,14 +26,10 @@ pub use vertex::Vertex;
 /// 地形解析器库的Result类型
 pub type Result<T> = std::result::Result<T, Error>;
 
-
+#[derive(Debug, Serialize)]
 pub struct QuantizedMeshTerrain{
-    header: Header,
-    vertex: Vertex
-}
-
-impl QuantizedMeshTerrain {
-    pub fn parse(){}
+    pub header: Header,
+    pub vertex: Vertex
 }
 
 

@@ -10,6 +10,7 @@
 
 use std::io::{Read, Seek, SeekFrom};
 use byteorder::{LittleEndian, ReadBytesExt};
+use serde::Serialize;
 use crate::Result;
 
 /// Extension identifiers for quantized-mesh format
@@ -27,7 +28,7 @@ pub enum QuantizedMeshExtensionIds {
 /// Oct-encoded per-vertex normal data
 /// Each vertex has 2 bytes for oct-encoded normal (xy components)
 /// Structure: unsigned char xy[vertexCount * 2];
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct OctEncodedVertexNormals {
     /// Oct-encoded normal data for each vertex, length = vertex_count * 2
     /// Each vertex uses 2 bytes: xy components
@@ -37,14 +38,14 @@ pub struct OctEncodedVertexNormals {
 /// Water mask data
 /// Fixed size 256x256 mask array
 /// Structure: unsigned char mask[256 * 256];
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct WaterMask {
     /// Water mask data, fixed size 256x256 = 65536 bytes
     pub mask:  Vec<u8>,
 }
 
 /// Tile metadata as JSON string
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct Metadata {
     /// JSON string containing tile metadata
     pub json: String,
@@ -52,7 +53,7 @@ pub struct Metadata {
 
 /// Container for all possible extensions
 /// Each field is optional since extensions may not be present
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct Extensions {
     /// Oct-encoded vertex normals, if present
     pub oct_vertex_normals: Option<OctEncodedVertexNormals>,
@@ -81,6 +82,7 @@ impl Extensions {
             let extension_id = reader.read_u8()?;
             println!(">> extension_id : {:?}", extension_id);
             let extension_length = reader.read_u32::<LittleEndian>()? as u64;
+            println!(">> extension_length : {:?}", extension_length);
 
             match extension_id {
                 id if id == QuantizedMeshExtensionIds::OctVertexNormals as u8 => {
@@ -109,9 +111,9 @@ impl Extensions {
                 }
                 id if id == QuantizedMeshExtensionIds::Metadata as u8 => {
                     // METADATA
-                    // unimplemented!("Metadata解析未实现...");
                     // Read string length
                     let string_length = reader.read_u32::<LittleEndian>()? as usize;
+                    println!(">> string_length : {:?}", string_length);
                     // Verify string length fits within extension_length
                     if string_length as u64 + 4 > extension_length {
                         return Err(crate::Error::InvalidFormat(format!(
